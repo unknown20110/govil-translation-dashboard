@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>דשבורד תרגום gov.il</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:        #0d1117;
+  --surface:   #161b22;
+  --surface2:  #1c2431;
+  --border:    #30363d;
+  --text:      #e6edf3;
+  --muted:     #7d8590;
+  --accent:    #58a6ff;
+  --green:     #3fb950;
+  --green-dim: #1a3d22;
+  --red:       #f85149;
+  --red-dim:   #3d1a1a;
+  --orange:    #d29922;
+  --ar:  #58a6ff;
+  --en:  #3fb950;
+  --ru:  #bc8cff;
+  --es:  #f78166;
+  --fr:  #ffa657;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Heebo', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  direction: rtl;
+}
+
+/* ── Header ── */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  font-weight: 900;
+  font-size: 1.1rem;
+  letter-spacing: -.5px;
+}
+.logo-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .5; transform: scale(.8); }
+}
+.run-badge {
+  font-size: .8rem;
+  color: var(--muted);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: .3rem .8rem;
+  border-radius: 20px;
+}
+#run-selector {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: .35rem .8rem;
+  border-radius: 8px;
+  font-family: 'Heebo', sans-serif;
+  font-size: .85rem;
+  cursor: pointer;
+  outline: none;
+}
+#run-selector:focus { border-color: var(--accent); }
+
+/* ── Layout ── */
+main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+
+/* ── KPI Row ── */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.kpi-card:hover { border-color: var(--accent); }
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 100%; height: 3px;
+  background: var(--card-color, var(--accent));
+}
+.kpi-label { font-size: .8rem; color: var(--muted); margin-bottom: .5rem; font-weight: 500; }
+.kpi-value { font-size: 2rem; font-weight: 900; line-height: 1; }
+.kpi-sub   { font-size: .78rem; color: var(--muted); margin-top: .4rem; }
+
+/* ── Charts Row ── */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+@media (max-width: 900px) { .charts-row { grid-template-columns: 1fr; } }
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+.chart-title {
+  font-size: .9rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+  color: var(--text);
+}
+.chart-wrap { position: relative; height: 260px; }
+
+/* ── Trends Row ── */
+.trend-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+/* ── Filters ── */
+.filters {
+  display: flex;
+  gap: .75rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+.filter-label { font-size: .8rem; color: var(--muted); }
+select, input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: .4rem .8rem;
+  border-radius: 8px;
+  font-family: 'Heebo', sans-serif;
+  font-size: .85rem;
+  outline: none;
+  direction: rtl;
+}
+select:focus, input:focus { border-color: var(--accent); }
+input[type=search] { min-width: 220px; }
+input[type=search]::placeholder { color: var(--muted); }
+
+/* ── Table ── */
+.table-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+.table-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.table-title { font-size: .95rem; font-weight: 700; }
+.count-badge {
+  font-size: .78rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: .2rem .7rem;
+  border-radius: 20px;
+  color: var(--muted);
+}
+.table-wrap { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .83rem;
+  direction: rtl;
+}
+th {
+  text-align: right;
+  padding: .75rem 1rem;
+  background: var(--surface2);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: .78rem;
+  letter-spacing: .3px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+th:hover { color: var(--text); }
+th .sort-arrow { margin-right: 4px; opacity: .4; }
+th.sorted .sort-arrow { opacity: 1; color: var(--accent); }
+td {
+  padding: .7rem 1rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--surface2); }
+
+.lang-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: .18rem .55rem;
+  border-radius: 20px;
+  font-size: .72rem;
+  font-weight: 600;
+  margin: 1px;
+  white-space: nowrap;
+}
+.pill-ar  { background: #0d2240; color: var(--ar);  border: 1px solid #1a4070; }
+.pill-en  { background: #0d2a14; color: var(--en);  border: 1px solid #1a4a25; }
+.pill-ru  { background: #1a1040; color: var(--ru);  border: 1px solid #2e1a70; }
+.pill-es  { background: #2a1008; color: var(--es);  border: 1px solid #5a2010; }
+.pill-fr  { background: #2a1a00; color: var(--fr);  border: 1px solid #5a3800; }
+.pill-none { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); font-size: .7rem; }
+
+.views-bar {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.views-track {
+  flex: 1;
+  height: 5px;
+  background: var(--surface2);
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 60px;
+}
+.views-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width .4s;
+}
+.views-num { min-width: 60px; text-align: left; color: var(--muted); font-size: .78rem; }
+
+/* ── Ministry summary ── */
+.ministry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.ministry-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.2rem 1.4rem;
+  transition: border-color .2s;
+  cursor: pointer;
+}
+.ministry-card:hover { border-color: var(--accent); }
+.ministry-name { font-weight: 700; font-size: .95rem; margin-bottom: .75rem; }
+.ministry-ar-name { font-size: .8rem; color: var(--muted); margin-top: -.5rem; margin-bottom: .75rem; }
+.lang-row { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .6rem; }
+.progress-row { display: flex; align-items: center; gap: .6rem; margin-top: .6rem; }
+.progress-track {
+  flex: 1; height: 6px;
+  background: var(--surface2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .6s ease;
+}
+.progress-pct { font-size: .78rem; color: var(--muted); min-width: 38px; text-align: left; }
+
+/* ── Empty ── */
+.empty { text-align: center; padding: 3rem; color: var(--muted); }
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2rem;
+}
+.tab {
+  padding: .75rem 1.5rem;
+  font-size: .88rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  transition: all .2s;
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── Section titles ── */
+.section-title {
+  font-size: .9rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 1rem;
+}
+
+/* ── Loading ── */
+#loading {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 1rem;
+  z-index: 999;
+  transition: opacity .4s;
+}
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <span style="color:var(--muted);font-size:.9rem">טוען נתונים…</span>
+</div>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    דשבורד תרגום gov.il
+  </div>
+  <div style="display:flex;gap:1rem;align-items:center">
+    <span class="run-badge" id="run-count-badge">—</span>
+    <select id="run-selector" title="בחר ריצה"></select>
+  </div>
+</header>
+
+<main>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" data-tab="overview">סקירה כללית</div>
+    <div class="tab" data-tab="pages">טבלת דפים</div>
+    <div class="tab" data-tab="ministries">לפי משרד</div>
+    <div class="tab" data-tab="trends">מגמות היסטוריות</div>
+  </div>
+
+  <!-- ── TAB: Overview ── -->
+  <div id="tab-overview" class="tab-content">
+
+    <div class="kpi-row" id="kpi-row"></div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">כיסוי תרגום לפי שפה</div>
+        <div class="chart-wrap"><canvas id="chart-langs"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Top 10 דפים לפי צפיות</div>
+        <div class="chart-wrap"><canvas id="chart-top-pages"></canvas></div>
+      </div>
+    </div>
+
+    <div class="chart-card" style="margin-bottom:2rem">
+      <div class="chart-title">כיסוי תרגום לפי משרד (% ערבית)</div>
+      <div class="chart-wrap" style="height:320px"><canvas id="chart-ministry"></canvas></div>
+    </div>
+
+  </div>
+
+  <!-- ── TAB: Pages ── -->
+  <div id="tab-pages" class="tab-content" style="display:none">
+
+    <div class="filters">
+      <span class="filter-label">סינון:</span>
+      <input type="search" id="search-input" placeholder="חיפוש לפי שם דף / משרד…">
+      <select id="filter-ministry"><option value="">כל המשרדים</option></select>
+      <select id="filter-lang">
+        <option value="">כל השפות</option>
+        <option value="ar">ערבית</option>
+        <option value="en">אנגלית</option>
+        <option value="ru">רוסית</option>
+        <option value="es">ספרדית</option>
+        <option value="fr">צרפתית</option>
+      </select>
+      <select id="filter-translated">
+        <option value="">הכל</option>
+        <option value="yes">מתורגם</option>
+        <option value="no">לא מתורגם</option>
+      </select>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header">
+        <span class="table-title">דפים</span>
+        <span class="count-badge" id="table-count">—</span>
+      </div>
+      <div class="table-wrap">
+        <table id="pages-table">
+          <thead>
+            <tr>
+              <th data-col="ministry_he">משרד <span class="sort-arrow">↕</span></th>
+              <th data-col="title_he">שם הדף <span class="sort-arrow">↕</span></th>
+              <th>שפות</th>
+              <th data-col="views">צפיות <span class="sort-arrow">↕</span></th>
+              <th data-col="page_type">סוג <span class="sort-arrow">↕</span></th>
+            </tr>
+          </thead>
+          <tbody id="pages-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB: Ministries ── -->
+  <div id="tab-ministries" class="tab-content" style="display:none">
+    <div class="ministry-grid" id="ministry-grid"></div>
+  </div>
+
+  <!-- ── TAB: Trends ── -->
+  <div id="tab-trends" class="tab-content" style="display:none">
+    <div class="trend-card">
+      <div class="chart-title">מגמת תרגום לאורך זמן — % כיסוי לפי שפה</div>
+      <div class="chart-wrap" style="height:320px"><canvas id="chart-trend-pct"></canvas></div>
+    </div>
+    <div class="trend-card">
+      <div class="chart-title">מספר דפים מתורגמים לאורך זמן</div>
+      <div class="chart-wrap" style="height:280px"><canvas id="chart-trend-count"></canvas></div>
+    </div>
+    <div id="trends-note" style="color:var(--muted);font-size:.85rem;text-align:center;padding:1rem">
+      המגמות יתמלאו עם כל ריצה נוספת של הסקריפט.
+    </div>
+  </div>
+
+</main>
+
+<script>
+const LANG_META = {
+  ar: { label: 'ערבית',  cls: 'pill-ar',  color: '#58a6ff' },
+  en: { label: 'אנגלית', cls: 'pill-en',  color: '#3fb950' },
+  ru: { label: 'רוסית',  cls: 'pill-ru',  color: '#bc8cff' },
+  es: { label: 'ספרדית', cls: 'pill-es',  color: '#f78166' },
+  fr: { label: 'צרפתית', cls: 'pill-fr',  color: '#ffa657' },
+};
+
+let allRuns = [];
+let currentPages = [];
+let sortCol = 'views';
+let sortAsc = false;
+let charts = {};
+
+// ── Load data ──────────────────────────────────────────────────────────────
+async function loadData() {
+  const res = await fetch('translations_history.json?v=' + Date.now());
+  const data = await res.json();
+  allRuns = data.runs || [];
+
+  // Populate run selector
+  const sel = document.getElementById('run-selector');
+  allRuns.forEach((run, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${run.run_date}  (${run.pages.length} דפים)`;
+    if (i === allRuns.length - 1) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  document.getElementById('run-count-badge').textContent = `${allRuns.length} ריצות`;
+
+  sel.addEventListener('change', () => loadRun(parseInt(sel.value)));
+  loadRun(allRuns.length - 1);
+
+  document.getElementById('loading').style.opacity = '0';
+  setTimeout(() => document.getElementById('loading').style.display = 'none', 400);
+}
+
+function loadRun(idx) {
+  const run = allRuns[idx];
+  currentPages = run.pages;
+  renderOverview(run);
+  renderTable(currentPages);
+  renderMinistries(currentPages);
+  renderTrends();
+}
+
+// ── KPIs ──────────────────────────────────────────────────────────────────
+function renderOverview(run) {
+  const pages = run.pages;
+  const total = pages.length;
+  const totalViews = pages.reduce((s, p) => s + p.views, 0);
+
+  const kpiRow = document.getElementById('kpi-row');
+  const kpis = [
+    { label: 'סה"כ דפים', value: total.toLocaleString('he'), sub: 'דפים עבריים', color: 'var(--accent)' },
+    { label: 'סה"כ צפיות', value: fmtNum(totalViews), sub: 'בתקופה זו', color: 'var(--accent)' },
+  ];
+  Object.entries(LANG_META).forEach(([lc, meta]) => {
+    const count = pages.filter(p => p[`has_${lc}`]).length;
+    const pct = total ? Math.round(count / total * 100) : 0;
+    kpis.push({
+      label: `מתורגם — ${meta.label}`,
+      value: `${pct}%`,
+      sub: `${count} מתוך ${total} דפים`,
+      color: meta.color,
+    });
+  });
+
+  kpiRow.innerHTML = kpis.map(k => `
+    <div class="kpi-card" style="--card-color:${k.color}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value" style="color:${k.color}">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>
+  `).join('');
+
+  renderChartLangs(pages);
+  renderChartTopPages(pages);
+  renderChartMinistry(pages);
+}
+
+// ── Charts ─────────────────────────────────────────────────────────────────
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function renderChartLangs(pages) {
+  destroyChart('langs');
+  const total = pages.length;
+  const labels = [], data = [], colors = [];
+  Object.entries(LANG_META).forEach(([lc, meta]) => {
+    labels.push(meta.label);
+    data.push(total ? Math.round(pages.filter(p => p[`has_${lc}`]).length / total * 100) : 0);
+    colors.push(meta.color);
+  });
+  charts['langs'] = new Chart(document.getElementById('chart-langs'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: colors.map(c => c + '33'), borderColor: colors, borderWidth: 2, borderRadius: 6 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { min: 0, max: 100, ticks: { color: '#7d8590', callback: v => v + '%' }, grid: { color: '#30363d' } },
+        x: { ticks: { color: '#e6edf3', font: { family: 'Heebo', size: 12 } }, grid: { display: false } },
+      }
+    }
+  });
+}
+
+function renderChartTopPages(pages) {
+  destroyChart('top-pages');
+  const top = [...pages].sort((a,b) => b.views - a.views).slice(0, 10);
+  const labels = top.map(p => p.title_he ? p.title_he.slice(0, 22) + (p.title_he.length > 22 ? '…' : '') : p.slug);
+  const data   = top.map(p => p.views);
+  const colors = top.map(p => p.has_ar ? '#3fb95033' : '#f8514933');
+  const borders= top.map(p => p.has_ar ? '#3fb950' : '#f85149');
+  charts['top-pages'] = new Chart(document.getElementById('chart-top-pages'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: borders, borderWidth: 2, borderRadius: 4 }] },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + fmtNum(ctx.raw) + ' צפיות' } } },
+      scales: {
+        x: { ticks: { color: '#7d8590', callback: v => fmtNum(v) }, grid: { color: '#30363d' } },
+        y: { ticks: { color: '#e6edf3', font: { family: 'Heebo', size: 11 } }, grid: { display: false } },
+      }
+    }
+  });
+}
+
+function renderChartMinistry(pages) {
+  destroyChart('ministry');
+  const byMinistry = groupBy(pages, 'ministry_he');
+  const entries = Object.entries(byMinistry)
+    .filter(([k]) => k)
+    .map(([name, ps]) => ({ name, pct: Math.round(ps.filter(p => p.has_ar).length / ps.length * 100) }))
+    .sort((a,b) => b.pct - a.pct);
+
+  const labels = entries.map(e => e.name.slice(0, 18));
+  const data   = entries.map(e => e.pct);
+  const colors = data.map(v => v >= 80 ? '#3fb950' : v >= 40 ? '#d29922' : '#f85149');
+
+  charts['ministry'] = new Chart(document.getElementById('chart-ministry'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: colors.map(c => c + '44'), borderColor: colors, borderWidth: 2, borderRadius: 5 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + ctx.raw + '% ערבית' } } },
+      scales: {
+        y: { min: 0, max: 100, ticks: { color: '#7d8590', callback: v => v + '%' }, grid: { color: '#30363d' } },
+        x: { ticks: { color: '#e6edf3', font: { family: 'Heebo', size: 11 }, maxRotation: 35 }, grid: { display: false } },
+      }
+    }
+  });
+}
+
+// ── Table ──────────────────────────────────────────────────────────────────
+function renderTable(pages) {
+  populateMinistryFilter(pages);
+
+  const maxViews = Math.max(...pages.map(p => p.views));
+  const tbody = document.getElementById('pages-tbody');
+  tbody.innerHTML = pages.map(p => `
+    <tr>
+      <td title="${p.ministry_he}">${p.ministry_he || '—'}</td>
+      <td>
+        <a href="${p.url}" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:500"
+           title="${p.title_he}">${(p.title_he || p.slug).slice(0, 38)}${(p.title_he || p.slug).length > 38 ? '…' : ''}</a>
+        ${p.title_ar ? `<div style="font-size:.75rem;color:var(--muted);direction:rtl">${p.title_ar.slice(0,40)}</div>` : ''}
+      </td>
+      <td>${langPills(p)}</td>
+      <td>
+        <div class="views-bar">
+          <div class="views-track"><div class="views-fill" style="width:${Math.round(p.views/maxViews*100)}%"></div></div>
+          <span class="views-num">${fmtNum(p.views)}</span>
+        </div>
+      </td>
+      <td style="color:var(--muted)">${p.page_type || '—'}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" class="empty">אין תוצאות</td></tr>';
+
+  document.getElementById('table-count').textContent = `${pages.length} דפים`;
+}
+
+function langPills(p) {
+  const pills = Object.entries(LANG_META).map(([lc, meta]) =>
+    p[`has_${lc}`]
+      ? `<span class="lang-pill ${meta.cls}">✓ ${meta.label}</span>`
+      : `<span class="lang-pill pill-none">— ${meta.label}</span>`
+  );
+  return pills.join('');
+}
+
+// ── Ministry grid ──────────────────────────────────────────────────────────
+function renderMinistries(pages) {
+  const byMinistry = groupBy(pages, 'ministry_he');
+  const grid = document.getElementById('ministry-grid');
+
+  const cards = Object.entries(byMinistry)
+    .filter(([k]) => k)
+    .map(([name, ps]) => {
+      const totalViews = ps.reduce((s,p) => s + p.views, 0);
+      const arCount = ps.filter(p => p.has_ar).length;
+      const pct = Math.round(arCount / ps.length * 100);
+      const color = pct >= 80 ? 'var(--green)' : pct >= 40 ? 'var(--orange)' : 'var(--red)';
+      const arName = ps[0]?.ministry_ar || '';
+
+      const langCounts = {};
+      Object.keys(LANG_META).forEach(lc => {
+        langCounts[lc] = ps.filter(p => p[`has_${lc}`]).length;
+      });
+
+      return { name, arName, ps, totalViews, pct, color, langCounts };
+    })
+    .sort((a,b) => b.totalViews - a.totalViews);
+
+  grid.innerHTML = cards.map(c => `
+    <div class="ministry-card">
+      <div class="ministry-name">${c.name}</div>
+      ${c.arName ? `<div class="ministry-ar-name">${c.arName}</div>` : ''}
+      <div class="lang-row">
+        ${Object.entries(LANG_META).map(([lc, meta]) =>
+          `<span class="lang-pill ${c.langCounts[lc] > 0 ? meta.cls : 'pill-none'}">
+            ${meta.label} ${c.langCounts[lc]}/${c.ps.length}
+          </span>`
+        ).join('')}
+      </div>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.3rem">${fmtNum(c.totalViews)} צפיות • ${c.ps.length} דפים</div>
+      <div class="progress-row">
+        <div class="progress-track">
+          <div class="progress-fill" style="width:${c.pct}%;background:${c.color}"></div>
+        </div>
+        <span class="progress-pct" style="color:${c.color}">${c.pct}%</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Trends ─────────────────────────────────────────────────────────────────
+function renderTrends() {
+  destroyChart('trend-pct');
+  destroyChart('trend-count');
+
+  const note = document.getElementById('trends-note');
+  if (allRuns.length < 2) {
+    note.style.display = 'block';
+  } else {
+    note.style.display = 'none';
+  }
+
+  const labels = allRuns.map(r => r.run_date);
+
+  const datasets_pct = Object.entries(LANG_META).map(([lc, meta]) => ({
+    label: meta.label,
+    data: allRuns.map(r => {
+      const total = r.pages.length;
+      return total ? Math.round(r.pages.filter(p => p[`has_${lc}`]).length / total * 100) : 0;
+    }),
+    borderColor: meta.color,
+    backgroundColor: meta.color + '22',
+    tension: .4, fill: false, pointRadius: 5, pointHoverRadius: 7,
+  }));
+
+  charts['trend-pct'] = new Chart(document.getElementById('chart-trend-pct'), {
+    type: 'line',
+    data: { labels, datasets: datasets_pct },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#e6edf3', font: { family: 'Heebo' }, boxWidth: 12 } } },
+      scales: {
+        y: { min: 0, max: 100, ticks: { color: '#7d8590', callback: v => v + '%' }, grid: { color: '#30363d' } },
+        x: { ticks: { color: '#7d8590' }, grid: { color: '#30363d' } },
+      }
+    }
+  });
+
+  const datasets_count = Object.entries(LANG_META).map(([lc, meta]) => ({
+    label: meta.label,
+    data: allRuns.map(r => r.pages.filter(p => p[`has_${lc}`]).length),
+    borderColor: meta.color,
+    backgroundColor: meta.color + '22',
+    tension: .4, fill: true, pointRadius: 5,
+  }));
+
+  charts['trend-count'] = new Chart(document.getElementById('chart-trend-count'), {
+    type: 'line',
+    data: { labels, datasets: datasets_count },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#e6edf3', font: { family: 'Heebo' }, boxWidth: 12 } } },
+      scales: {
+        y: { ticks: { color: '#7d8590' }, grid: { color: '#30363d' } },
+        x: { ticks: { color: '#7d8590' }, grid: { color: '#30363d' } },
+      }
+    }
+  });
+}
+
+// ── Filters ────────────────────────────────────────────────────────────────
+function populateMinistryFilter(pages) {
+  const sel = document.getElementById('filter-ministry');
+  const current = sel.value;
+  const ministries = [...new Set(pages.map(p => p.ministry_he).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">כל המשרדים</option>' +
+    ministries.map(m => `<option value="${m}" ${m === current ? 'selected' : ''}>${m}</option>`).join('');
+}
+
+function applyFilters() {
+  const q    = document.getElementById('search-input').value.trim().toLowerCase();
+  const min  = document.getElementById('filter-ministry').value;
+  const lang = document.getElementById('filter-lang').value;
+  const trans= document.getElementById('filter-translated').value;
+
+  let filtered = currentPages.filter(p => {
+    if (q && !(`${p.title_he} ${p.ministry_he} ${p.slug}`.toLowerCase().includes(q))) return false;
+    if (min && p.ministry_he !== min) return false;
+    if (lang && !p[`has_${lang}`]) return false;
+    if (trans === 'yes' && !p.has_ar) return false;
+    if (trans === 'no' && p.has_ar)  return false;
+    return true;
+  });
+
+  filtered = sortPages(filtered);
+  renderTable(filtered);
+}
+
+function sortPages(pages) {
+  return [...pages].sort((a, b) => {
+    let va = a[sortCol], vb = b[sortCol];
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    if (va < vb) return sortAsc ? -1 : 1;
+    if (va > vb) return sortAsc ? 1 : -1;
+    return 0;
+  });
+}
+
+// ── Tabs ───────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+    tab.classList.add('active');
+    document.getElementById(`tab-${tab.dataset.tab}`).style.display = '';
+  });
+});
+
+// ── Sort columns ───────────────────────────────────────────────────────────
+document.querySelectorAll('th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (sortCol === col) sortAsc = !sortAsc;
+    else { sortCol = col; sortAsc = false; }
+    document.querySelectorAll('th').forEach(t => t.classList.remove('sorted'));
+    th.classList.add('sorted');
+    th.querySelector('.sort-arrow').textContent = sortAsc ? '↑' : '↓';
+    applyFilters();
+  });
+});
+
+// ── Filter events ──────────────────────────────────────────────────────────
+['search-input','filter-ministry','filter-lang','filter-translated'].forEach(id => {
+  document.getElementById(id).addEventListener('input', applyFilters);
+  document.getElementById(id).addEventListener('change', applyFilters);
+});
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function groupBy(arr, key) {
+  return arr.reduce((acc, item) => {
+    const k = item[key] || '';
+    (acc[k] = acc[k] || []).push(item);
+    return acc;
+  }, {});
+}
+function fmtNum(n) {
+  if (n >= 1_000_000) return (n/1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000)     return (n/1_000).toFixed(0) + 'K';
+  return n.toString();
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+loadData().catch(err => {
+  document.getElementById('loading').innerHTML =
+    `<div style="color:var(--red);text-align:center;padding:2rem">
+      <div style="font-size:1.5rem;margin-bottom:.5rem">⚠️ שגיאת טעינה</div>
+      <div style="font-size:.85rem;color:var(--muted)">${err.message}</div>
+      <div style="font-size:.8rem;color:var(--muted);margin-top:.5rem">וודא ש-translations_history.json קיים בתיקיה</div>
+    </div>`;
+});
+</script>
+</body>
+</html>
