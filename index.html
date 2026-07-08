@@ -663,10 +663,7 @@ async function loadData() {
   const rawRuns = data.runs || [];
   allRuns = rawRuns.map((run, i) => {
     const filtered = run.pages.filter(p => !isExcluded(p));
-    if (i === rawRuns.length - 1) {
-      updateExclusionBadge(run.pages, filtered);
-    }
-    return { ...run, pages: filtered };
+    return { ...run, pages: filtered, originalPages: run.pages };
   });
 
 
@@ -691,6 +688,7 @@ async function loadData() {
 function loadRun(idx) {
   const run = allRuns[idx];
   currentPages = run.pages;
+  updateExclusionBadge(run.originalPages || run.pages, run.pages);
   renderOverview(run);
   renderTable(currentPages);
   renderMinistries(currentPages);
