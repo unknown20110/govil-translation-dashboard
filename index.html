@@ -377,7 +377,6 @@ tr:hover td { background: var(--surface2); }
 }
 .exclusion-badge:hover { border-color: var(--accent); color: var(--text); }
 .exclusion-badge .ex-count { color: var(--orange); font-weight: 700; font-size: 1rem; }
-
 .modal-overlay {
   display: none;
   position: fixed; inset: 0;
@@ -409,7 +408,6 @@ tr:hover td { background: var(--surface2); }
   font-size: 1.4rem; cursor: pointer; line-height: 1;
 }
 .modal-close:hover { color: var(--text); }
-.modal-actions { display: flex; gap: .75rem; }
 .btn-sheets {
   display: inline-flex; align-items: center; gap: .4rem;
   background: var(--accent); color: #000;
@@ -456,6 +454,22 @@ tr:hover td { background: var(--surface2); }
   </div>
 </header>
 
+<!-- ── Exclusion Modal ── -->
+<div class="modal-overlay" id="exclusion-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>🚫 דפים מוחרגים מהדשבורד (<span id="modal-excl-count">0</span>)</h3>
+      <button class="modal-close" onclick="document.getElementById('exclusion-modal').classList.remove('open')">×</button>
+    </div>
+    <div>
+      <a class="btn-sheets" href="https://docs.google.com/spreadsheets/d/12WuXYvPWjY6KOmN6nSVTMdGwEYmuSE2iBgd4Dz-w1ZE/edit" target="_blank">
+        ✏️ עריכת רשימת ההחרגה
+      </a>
+    </div>
+    <div class="modal-list" id="modal-excl-list"></div>
+  </div>
+</div>
+
 <main>
 
   <!-- Tabs -->
@@ -469,23 +483,6 @@ tr:hover td { background: var(--surface2); }
   <!-- ── TAB: Overview ── -->
   <div id="tab-overview" class="tab-content">
 
-
-<!-- ── Exclusion Modal ── -->
-<div class="modal-overlay" id="exclusion-modal">
-  <div class="modal-box">
-    <div class="modal-header">
-      <h3>🚫 דפים מוחרגים מהדשבורד (<span id="modal-excl-count">0</span>)</h3>
-      <button class="modal-close" onclick="document.getElementById('exclusion-modal').classList.remove('open')">×</button>
-    </div>
-    <div class="modal-actions">
-      <a class="btn-sheets" href="https://docs.google.com/spreadsheets/d/12WuXYvPWjY6KOmN6nSVTMdGwEYmuSE2iBgd4Dz-w1ZE/edit" target="_blank">
-        ✏️ עריכת רשימת ההחרגה
-      </a>
-    </div>
-    <div class="modal-list" id="modal-excl-list"></div>
-  </div>
-</div>
-
     <div style="background:var(--surface2);border:1px solid var(--border);border-right:3px solid var(--accent);border-radius:8px;padding:.85rem 1.25rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:.75rem">
       <span style="font-size:1.1rem">ℹ️</span>
       <span style="font-size:.85rem;color:var(--muted);line-height:1.6">
@@ -494,8 +491,6 @@ tr:hover td { background: var(--surface2); }
       </span>
     </div>
 
-
-    <!-- Exclusion badge -->
     <div class="exclusion-badge" onclick="openExclusionModal()">
       <span>🚫 דפים מוחרגים:</span>
       <span class="ex-count" id="excl-badge-count">0</span>
@@ -604,10 +599,76 @@ let sortAsc = false;
 let charts = {};
 
 // ── Load data ──────────────────────────────────────────────────────────────
+
+// ── רשימת החרגה מ-Google Sheets ──────────────────────────────────────────
+const EXCLUSION_SHEET_ID = '12WuXYvPWjY6KOmN6nSVTMdGwEYmuSE2iBgd4Dz-w1ZE';
+let exclusionSet = new Set();
+let excludedPages = [];
+
+async function loadExclusionList() {
+  try {
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${EXCLUSION_SHEET_ID}/export?format=csv&cachebust=${Date.now()}`;
+    const res = await fetch(csvUrl);
+    const text = await res.text();
+    const lines = text.split('\n').slice(1);
+    lines.forEach(line => {
+      const url = line.trim().replace(/^"|"$/g, '');
+      if (url) exclusionSet.add(url);
+    });
+    console.log(`נטענו ${exclusionSet.size} דפים להחרגה`);
+  } catch (e) {
+    console.warn('לא ניתן לטעון רשימת החרגה:', e);
+  }
+}
+
+function isExcluded(page) {
+  if (!page.url) return false;
+  try {
+    const path = new URL(page.url).pathname;
+    return [...exclusionSet].some(excl => path === excl || path.endsWith(excl));
+  } catch {
+    return false;
+  }
+}
+
+function updateExclusionBadge(originalPages, filteredPages) {
+  const excluded = originalPages.filter(p => !filteredPages.find(fp => fp.url === p.url));
+  excludedPages = excluded;
+  document.getElementById('excl-badge-count').textContent = excluded.length;
+  document.getElementById('modal-excl-count').textContent = excluded.length;
+  const list = document.getElementById('modal-excl-list');
+  if (excluded.length === 0) {
+    list.innerHTML = '<div class="modal-list-item" style="color:var(--green)">אין דפים מוחרגים</div>';
+  } else {
+    list.innerHTML = excluded.map(p => {
+      const path = p.url ? (() => { try { return new URL(p.url).pathname; } catch { return p.url; } })() : (p.slug || '');
+      return `<div class="modal-list-item">${path}</div>`;
+    }).join('');
+  }
+}
+
+function openExclusionModal() {
+  document.getElementById('exclusion-modal').classList.add('open');
+}
+
+document.addEventListener('click', e => {
+  const modal = document.getElementById('exclusion-modal');
+  if (e.target === modal) modal.classList.remove('open');
+});
+
 async function loadData() {
+  await loadExclusionList();
   const res = await fetch('translations_history.json?v=' + Date.now());
   const data = await res.json();
-  allRuns = data.runs || [];
+  const rawRuns = data.runs || [];
+  allRuns = rawRuns.map((run, i) => {
+    const filtered = run.pages.filter(p => !isExcluded(p));
+    if (i === rawRuns.length - 1) {
+      updateExclusionBadge(run.pages, filtered);
+    }
+    return { ...run, pages: filtered };
+  });
+
 
   // Populate run selector
   const sel = document.getElementById('run-selector');
