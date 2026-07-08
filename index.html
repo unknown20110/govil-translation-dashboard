@@ -359,6 +359,82 @@ tr:hover td { background: var(--surface2); }
   animation: spin .7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Exclusion badge & modal ─────────────────────────────────────────────── */
+.exclusion-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .5rem 1rem;
+  font-size: .82rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color .2s;
+  margin-bottom: 1.5rem;
+}
+.exclusion-badge:hover { border-color: var(--accent); color: var(--text); }
+.exclusion-badge .ex-count { color: var(--orange); font-weight: 700; font-size: 1rem; }
+
+.modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.7);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: min(680px, 94vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-header h3 { font-size: 1rem; font-weight: 700; }
+.modal-close {
+  background: none; border: none; color: var(--muted);
+  font-size: 1.4rem; cursor: pointer; line-height: 1;
+}
+.modal-close:hover { color: var(--text); }
+.modal-actions { display: flex; gap: .75rem; }
+.btn-sheets {
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: var(--accent); color: #000;
+  border: none; border-radius: 6px;
+  padding: .45rem 1rem; font-size: .85rem; font-weight: 700;
+  cursor: pointer; text-decoration: none;
+}
+.btn-sheets:hover { opacity: .85; }
+.modal-list {
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: .8rem;
+  color: var(--muted);
+}
+.modal-list-item {
+  padding: .4rem .75rem;
+  border-bottom: 1px solid var(--border);
+  font-family: monospace;
+  direction: ltr;
+  text-align: left;
+}
+.modal-list-item:last-child { border-bottom: none; }
+.modal-list-item:hover { background: var(--surface2); color: var(--text); }
+
 </style>
 </head>
 <body>
@@ -393,12 +469,37 @@ tr:hover td { background: var(--surface2); }
   <!-- ── TAB: Overview ── -->
   <div id="tab-overview" class="tab-content">
 
+
+<!-- ── Exclusion Modal ── -->
+<div class="modal-overlay" id="exclusion-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>🚫 דפים מוחרגים מהדשבורד (<span id="modal-excl-count">0</span>)</h3>
+      <button class="modal-close" onclick="document.getElementById('exclusion-modal').classList.remove('open')">×</button>
+    </div>
+    <div class="modal-actions">
+      <a class="btn-sheets" href="https://docs.google.com/spreadsheets/d/12WuXYvPWjY6KOmN6nSVTMdGwEYmuSE2iBgd4Dz-w1ZE/edit" target="_blank">
+        ✏️ עריכת רשימת ההחרגה
+      </a>
+    </div>
+    <div class="modal-list" id="modal-excl-list"></div>
+  </div>
+</div>
+
     <div style="background:var(--surface2);border:1px solid var(--border);border-right:3px solid var(--accent);border-radius:8px;padding:.85rem 1.25rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:.75rem">
       <span style="font-size:1.1rem">ℹ️</span>
       <span style="font-size:.85rem;color:var(--muted);line-height:1.6">
         הדשבורד מציג דפים פופולריים באתר gov.il שנצברו לפחות <strong style="color:var(--text)">1,000 צפיות בחודש האחרון</strong>.
         הנתונים מבוססים על דוח GA4 ומציגים את סטטוס התרגום של כל דף לכלל השפות הזמינות באתר.
       </span>
+    </div>
+
+
+    <!-- Exclusion badge -->
+    <div class="exclusion-badge" onclick="openExclusionModal()">
+      <span>🚫 דפים מוחרגים:</span>
+      <span class="ex-count" id="excl-badge-count">0</span>
+      <span>לחץ לפרטים</span>
     </div>
 
     <div class="kpi-row" id="kpi-row"></div>
@@ -503,44 +604,10 @@ let sortAsc = false;
 let charts = {};
 
 // ── Load data ──────────────────────────────────────────────────────────────
-// ── רשימת החרגה מ-Google Sheets ─────────────────────────────────────────
-const EXCLUSION_SHEET_ID = '12WuXYvPWjY6KOmN6nSVTMdGwEYmuSE2iBgd4Dz-w1ZE';
-let exclusionSet = new Set();
-
-async function loadExclusionList() {
-  try {
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${EXCLUSION_SHEET_ID}/export?format=csv&cachebust=${Date.now()}`;
-    const res = await fetch(csvUrl);
-    const text = await res.text();
-    const lines = text.split('\n').slice(1);
-    lines.forEach(line => {
-      const url = line.trim().replace(/^"|"$/g, '');
-      if (url) exclusionSet.add(url);
-    });
-    console.log(`נטענו ${exclusionSet.size} דפים להחרגה`);
-  } catch (e) {
-    console.warn('לא ניתן לטעון רשימת החרגה:', e);
-  }
-}
-
-function isExcluded(page) {
-  if (!page.url) return false;
-  try {
-    const path = new URL(page.url).pathname;
-    return [...exclusionSet].some(excl => path === excl || path.endsWith(excl));
-  } catch {
-    return false;
-  }
-}
-
 async function loadData() {
-  await loadExclusionList();
   const res = await fetch('translations_history.json?v=' + Date.now());
   const data = await res.json();
-  allRuns = (data.runs || []).map(run => ({
-    ...run,
-    pages: run.pages.filter(p => !isExcluded(p))
-  }));
+  allRuns = data.runs || [];
 
   // Populate run selector
   const sel = document.getElementById('run-selector');
