@@ -433,66 +433,6 @@ tr:hover td { background: var(--surface2); }
 .modal-list-item:last-child { border-bottom: none; }
 .modal-list-item:hover { background: var(--surface2); color: var(--text); }
 
-
-/* ── Modal stats ─────────────────────────────────────────────────────────── */
-.modal-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: .75rem;
-}
-.modal-stat-card {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: .75rem 1rem;
-  text-align: center;
-}
-.modal-stat-value {
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: var(--orange);
-  line-height: 1.2;
-}
-.modal-stat-label {
-  font-size: .72rem;
-  color: var(--muted);
-  margin-top: .25rem;
-}
-.modal-breakdown {
-  display: flex;
-  flex-direction: column;
-  gap: .4rem;
-}
-.modal-breakdown-row {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  font-size: .8rem;
-}
-.modal-breakdown-label { color: var(--muted); flex: 1; }
-.modal-breakdown-bar-wrap {
-  flex: 2;
-  background: var(--border);
-  border-radius: 4px;
-  height: 6px;
-  overflow: hidden;
-}
-.modal-breakdown-bar {
-  height: 100%;
-  border-radius: 4px;
-  background: var(--accent);
-  transition: width .4s;
-}
-.modal-breakdown-val { color: var(--text); font-weight: 600; min-width: 2.5rem; text-align: right; }
-.modal-section-title {
-  font-size: .78rem;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  margin-bottom: .4rem;
-}
-
 </style>
 </head>
 <body>
@@ -518,45 +458,14 @@ tr:hover td { background: var(--surface2); }
 <div class="modal-overlay" id="exclusion-modal">
   <div class="modal-box">
     <div class="modal-header">
-      <h3>🚫 דפים מוחרגים מהדשבורד</h3>
+      <h3>🚫 דפים מוחרגים מהדשבורד (<span id="modal-excl-count">0</span>)</h3>
       <button class="modal-close" onclick="document.getElementById('exclusion-modal').classList.remove('open')">×</button>
     </div>
-
-    <!-- Stats row -->
-    <div class="modal-stats">
-      <div class="modal-stat-card">
-        <div class="modal-stat-value" id="modal-excl-count">0</div>
-        <div class="modal-stat-label">מוחרגו בפועל מהריצה</div>
-      </div>
-      <div class="modal-stat-card">
-        <div class="modal-stat-value" id="modal-sheet-count">0</div>
-        <div class="modal-stat-label">סה"כ ברשימת רונית</div>
-      </div>
-      <div class="modal-stat-card">
-        <div class="modal-stat-value" id="modal-excl-pct">0%</div>
-        <div class="modal-stat-label">מסך הדפים בסריקה</div>
-      </div>
-    </div>
-
-    <!-- Breakdown by type -->
-    <div>
-      <div class="modal-section-title">פילוח לפי סוג דף</div>
-      <div class="modal-breakdown" id="modal-breakdown-type"></div>
-    </div>
-
-    <!-- Breakdown by ministry -->
-    <div>
-      <div class="modal-section-title">פילוח לפי משרד</div>
-      <div class="modal-breakdown" id="modal-breakdown-ministry"></div>
-    </div>
-
     <div>
       <a class="btn-sheets" href="https://docs.google.com/spreadsheets/d/12WuXYvPWjY6KOmN6nSVTMdGwEYmuSE2iBgd4Dz-w1ZE/edit" target="_blank">
         ✏️ עריכת רשימת ההחרגה
       </a>
     </div>
-
-    <div class="modal-section-title">רשימת הדפים המוחרגים</div>
     <div class="modal-list" id="modal-excl-list"></div>
   </div>
 </div>
@@ -725,55 +634,8 @@ function isExcluded(page) {
 function updateExclusionBadge(originalPages, filteredPages) {
   const excluded = originalPages.filter(p => !filteredPages.find(fp => fp.url === p.url));
   excludedPages = excluded;
-  const total = originalPages.length;
-  const pct = total > 0 ? ((excluded.length / total) * 100).toFixed(1) : 0;
-
-  // Badge
   document.getElementById('excl-badge-count').textContent = excluded.length;
-
-  // Stats
   document.getElementById('modal-excl-count').textContent = excluded.length;
-  document.getElementById('modal-sheet-count').textContent = exclusionSet.size;
-  document.getElementById('modal-excl-pct').textContent = pct + '%';
-
-  // Breakdown by type
-  const typeMap = {};
-  excluded.forEach(p => {
-    const path = p.url ? (() => { try { return new URL(p.url).pathname; } catch { return p.url; } })() : '';
-    const parts = path.split('/').filter(Boolean);
-    const type = parts[1] || 'אחר';
-    typeMap[type] = (typeMap[type] || 0) + 1;
-  });
-  const typeBreakdown = document.getElementById('modal-breakdown-type');
-  const maxType = Math.max(...Object.values(typeMap), 1);
-  typeBreakdown.innerHTML = Object.entries(typeMap)
-    .sort((a,b) => b[1]-a[1])
-    .map(([k,v]) => `
-      <div class="modal-breakdown-row">
-        <span class="modal-breakdown-label">/${k}/</span>
-        <div class="modal-breakdown-bar-wrap"><div class="modal-breakdown-bar" style="width:${(v/maxType*100).toFixed(0)}%"></div></div>
-        <span class="modal-breakdown-val">${v}</span>
-      </div>`).join('');
-
-  // Breakdown by ministry
-  const minMap = {};
-  excluded.forEach(p => {
-    const min = p.office_he || p.ministry || 'לא ידוע';
-    minMap[min] = (minMap[min] || 0) + 1;
-  });
-  const minBreakdown = document.getElementById('modal-breakdown-ministry');
-  const maxMin = Math.max(...Object.values(minMap), 1);
-  minBreakdown.innerHTML = Object.entries(minMap)
-    .sort((a,b) => b[1]-a[1])
-    .slice(0, 8)
-    .map(([k,v]) => `
-      <div class="modal-breakdown-row">
-        <span class="modal-breakdown-label">${k}</span>
-        <div class="modal-breakdown-bar-wrap"><div class="modal-breakdown-bar" style="width:${(v/maxMin*100).toFixed(0)}%"></div></div>
-        <span class="modal-breakdown-val">${v}</span>
-      </div>`).join('');
-
-  // List
   const list = document.getElementById('modal-excl-list');
   if (excluded.length === 0) {
     list.innerHTML = '<div class="modal-list-item" style="color:var(--green)">אין דפים מוחרגים</div>';
