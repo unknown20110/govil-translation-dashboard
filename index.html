@@ -503,10 +503,44 @@ let sortAsc = false;
 let charts = {};
 
 // ── Load data ──────────────────────────────────────────────────────────────
+// ── רשימת החרגה מ-Google Sheets ─────────────────────────────────────────
+const EXCLUSION_SHEET_ID = '12WuXYvPWjY6KOmN6nSVTMdGwEYmuSE2iBgd4Dz-w1ZE';
+let exclusionSet = new Set();
+
+async function loadExclusionList() {
+  try {
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${EXCLUSION_SHEET_ID}/export?format=csv&cachebust=${Date.now()}`;
+    const res = await fetch(csvUrl);
+    const text = await res.text();
+    const lines = text.split('\n').slice(1);
+    lines.forEach(line => {
+      const url = line.trim().replace(/^"|"$/g, '');
+      if (url) exclusionSet.add(url);
+    });
+    console.log(`נטענו ${exclusionSet.size} דפים להחרגה`);
+  } catch (e) {
+    console.warn('לא ניתן לטעון רשימת החרגה:', e);
+  }
+}
+
+function isExcluded(page) {
+  if (!page.url) return false;
+  try {
+    const path = new URL(page.url).pathname;
+    return [...exclusionSet].some(excl => path === excl || path.endsWith(excl));
+  } catch {
+    return false;
+  }
+}
+
 async function loadData() {
+  await loadExclusionList();
   const res = await fetch('translations_history.json?v=' + Date.now());
   const data = await res.json();
-  allRuns = data.runs || [];
+  allRuns = (data.runs || []).map(run => ({
+    ...run,
+    pages: run.pages.filter(p => !isExcluded(p))
+  }));
 
   // Populate run selector
   const sel = document.getElementById('run-selector');
