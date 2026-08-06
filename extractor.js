@@ -89,9 +89,15 @@
     // הסרת אלמנטים לא רלוונטיים לתרגום, כולל widget השיתוף (שתפו:) של gov.il
     wrapper
       .querySelectorAll(
-        'script, style, button, svg, img, iframe, nav, [aria-hidden="true"], .hidden-print, [name="AllSocialURLs"]'
+        'script, style, button, svg, img, iframe, nav, [aria-hidden="true"], .hidden-print, [name="AllSocialURLs"], h2[name="ServiceDescription"]'
       )
       .forEach((el) => el.remove());
+
+    // שאריות ידועות של widget השיתוף שלא נתפסות ע"י ההסרות הכלליות (label בודד "שתפו:")
+    wrapper.querySelectorAll('div, span, p').forEach((el) => {
+      const t = el.textContent.trim();
+      if (t === 'שתפו:' || t === 'שתפו') el.remove();
+    });
 
     // הסרת קישורים ריקים (icon-only, למשל שאריות של כפתורי שיתוף) + ה-li/ul/ol שנשארים ריקים אחריהם
     let changed = true;
