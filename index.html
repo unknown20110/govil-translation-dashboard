@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
   --bg:        #0d1117;
@@ -573,7 +574,10 @@ tr:hover td { background: var(--surface2); }
         <h3 id="mm-name">—</h3>
         <div id="mm-ar-name" style="font-size:.8rem;color:var(--muted);margin-top:.2rem;direction:rtl"></div>
       </div>
-      <button class="modal-close" onclick="closeMinistryModal()">×</button>
+      <div style="display:flex;align-items:center;gap:.6rem">
+        <button class="btn-sheets" onclick="exportMinistryExcel()">📥 ייצוא לאקסל</button>
+        <button class="modal-close" onclick="closeMinistryModal()">×</button>
+      </div>
     </div>
 
     <div class="modal-stats">
@@ -739,6 +743,7 @@ const LANG_META = {
 let allRuns = [];
 let currentPages = [];
 let currentRunIdx = 0;
+let currentModalMinistry = null;
 let sortCol = 'views';
 let sortAsc = false;
 let charts = {};
@@ -1092,6 +1097,7 @@ function renderMinistries(pages, idx) {
 function openMinistryModal(name) {
   const ps = currentPages.filter(p => p.ministry_he === name);
   if (!ps.length) return;
+  currentModalMinistry = name;
 
   document.getElementById('mm-name').textContent = name;
   document.getElementById('mm-ar-name').textContent = ps[0]?.ministry_ar || '';
@@ -1178,6 +1184,101 @@ function openMinistryModal(name) {
 
 function closeMinistryModal() {
   document.getElementById('ministry-modal').classList.remove('open');
+}
+
+// ── ייצוא נתוני המשרד לאקסל (4 טאבים) ───────────────────────────────────────
+function exportMinistryExcel() {
+  const name = currentModalMinistry;
+  if (!name) return;
+  const ps = currentPages.filter(p => p.ministry_he === name);
+  if (!ps.length) return;
+
+  const run = allRuns[currentRunIdx];
+  const arName = ps[0]?.ministry_ar || '';
+  const totalViews = ps.reduce((s, p) => s + p.views, 0);
+  const arCount = ps.filter(p => p.has_ar).length;
+  const pct = Math.round(arCount / ps.length * 100);
+
+  const prevRun = currentRunIdx > 0 ? allRuns[currentRunIdx - 1] : null;
+  let prevPct = null;
+  if (prevRun) {
+    const prevPs = prevRun.pages.filter(p => p.ministry_he === name);
+    if (prevPs.length) prevPct = Math.round(prevPs.filter(p => p.has_ar).length / prevPs.length * 100);
+  }
+
+  const untranslated = ps.filter(p => !p.has_ar).sort((a, b) => b.views - a.views);
+  const topUntranslated = untranslated[0] || null;
+
+  const wb = XLSX.utils.book_new();
+  wb.Workbook = { Views: [{ RTL: true }] };
+
+  // ── טאב 1: סיכום ──
+  const summaryRows = [
+    ['משרד', name],
+    ['שם בערבית', arName],
+    ['תאריך ריצה', run.run_date],
+    [],
+    ['סה"כ דפים', ps.length],
+    ['סה"כ צפיות', totalViews],
+    ['% כיסוי ערבית', pct],
+    ['שינוי מהריצה הקודמת (נק\' אחוז)', prevPct !== null ? (pct - prevPct) : 'אין ריצה קודמת להשוואה'],
+    [],
+    ['הדף הכי דחוף לתרגום', topUntranslated ? (topUntranslated.title_he || topUntranslated.slug) : 'כל דפי המשרד מתורגמים'],
+    ['צפיות בדף זה', topUntranslated ? topUntranslated.views : ''],
+  ];
+  const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+  wsSummary['!cols'] = [{ wch: 30 }, { wch: 50 }];
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'סיכום');
+
+  // ── טאב 2: לפי סוג דף ──
+  const typeMap = {};
+  ps.forEach(p => {
+    const t = p.page_type || 'לא מוגדר';
+    if (!typeMap[t]) typeMap[t] = { total: 0, ar: 0 };
+    typeMap[t].total++;
+    if (p.has_ar) typeMap[t].ar++;
+  });
+  const typeRows = [['סוג דף', 'דפים בערבית', 'סה"כ דפים', '% כיסוי']];
+  Object.entries(typeMap)
+    .sort((a, b) => b[1].total - a[1].total)
+    .forEach(([t, v]) => typeRows.push([t, v.ar, v.total, Math.round(v.ar / v.total * 100)]));
+  const wsType = XLSX.utils.aoa_to_sheet(typeRows);
+  wsType['!cols'] = [{ wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, wsType, 'לפי סוג דף');
+
+  // ── טאב 3: מגמה לאורך הריצות ──
+  const trendRows = [['תאריך ריצה', 'סה"כ דפים', 'דפים בערבית', '% כיסוי']];
+  allRuns.forEach(r => {
+    const rps = r.pages.filter(p => p.ministry_he === name);
+    const rar = rps.filter(p => p.has_ar).length;
+    trendRows.push([r.run_date, rps.length, rar, rps.length ? Math.round(rar / rps.length * 100) : '']);
+  });
+  const wsTrend = XLSX.utils.aoa_to_sheet(trendRows);
+  wsTrend['!cols'] = [{ wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, wsTrend, 'מגמה');
+
+  // ── טאב 4: כל דפי המשרד ──
+  const pageRows = [['כותרת (עברית)', 'כותרת (ערבית)', 'סוג דף', 'צפיות', 'ערבית', 'אנגלית', 'רוסית', 'ספרדית', 'צרפתית', 'קישור']];
+  [...ps].sort((a, b) => b.views - a.views).forEach(p => {
+    pageRows.push([
+      p.title_he || p.slug,
+      p.title_ar || '',
+      p.page_type || '',
+      p.views,
+      p.has_ar ? 'כן' : 'לא',
+      p.has_en ? 'כן' : 'לא',
+      p.has_ru ? 'כן' : 'לא',
+      p.has_es ? 'כן' : 'לא',
+      p.has_fr ? 'כן' : 'לא',
+      p.url || '',
+    ]);
+  });
+  const wsPages = XLSX.utils.aoa_to_sheet(pageRows);
+  wsPages['!cols'] = [{ wch: 45 }, { wch: 35 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 55 }];
+  XLSX.utils.book_append_sheet(wb, wsPages, 'דפים');
+
+  const safeName = name.replace(/[\\/:*?"<>|]/g, '').trim();
+  XLSX.writeFile(wb, `תרגום - ${safeName} - ${run.run_date}.xlsx`);
 }
 
 function renderMinistryTrend(name) {
