@@ -85,16 +85,58 @@
   function cleanHtml(html) {
     const wrapper = document.createElement('div');
     wrapper.innerHTML = html || '';
+
+    // הסרת אלמנטים לא רלוונטיים לתרגום, כולל widget השיתוף (שתפו:) של gov.il
     wrapper
-      .querySelectorAll('script, style, button, svg, img, iframe, [aria-hidden="true"], .hidden-print')
+      .querySelectorAll(
+        'script, style, button, svg, img, iframe, nav, [aria-hidden="true"], .hidden-print, [name="AllSocialURLs"]'
+      )
       .forEach((el) => el.remove());
-    // הסרת attributes שגורמים לרעש (class/style עם hash-ים של Angular)
+
+    // הסרת קישורים ריקים (icon-only, למשל שאריות של כפתורי שיתוף) + ה-li/ul/ol שנשארים ריקים אחריהם
+    let changed = true;
+    while (changed) {
+      changed = false;
+      wrapper.querySelectorAll('a').forEach((a) => {
+        if (!a.textContent.trim()) {
+          a.remove();
+          changed = true;
+        }
+      });
+      wrapper.querySelectorAll('li, ul, ol, div, span').forEach((el) => {
+        if (!el.textContent.trim() && el.children.length === 0) {
+          el.remove();
+          changed = true;
+        }
+      });
+    }
+
+    // הסרת כותרות ריקות (קיימות לפעמים כבר בדף המקור, למשל h2[name="ServiceDescription"])
+    wrapper.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((h) => {
+      if (!h.textContent.trim()) h.remove();
+    });
+
+    // הסרת attributes שגורמים לרעש (class/style עם hash-ים של Angular, onclick וכו')
     wrapper.querySelectorAll('*').forEach((el) => {
       el.removeAttribute('class');
       el.removeAttribute('style');
       el.removeAttribute('id');
+      el.removeAttribute('onclick');
+      el.removeAttribute('target');
     });
+
     return wrapper.innerHTML.trim();
+  }
+
+  // בעמודי Service, הכותרת (h1) כבר נמצאת בתוך אזור התוכן עצמו (בשונה מעמודי Angular,
+  // שם היא חיה מחוץ ל-htmlContent). בודקים את זה כדי לא להזריק כותרת כפולה.
+  function contentAlreadyStartsWithTitle(rawHtml, title) {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = rawHtml || '';
+    const firstHeading = wrapper.querySelector('h1, h2, h3');
+    if (!firstHeading) return false;
+    const normalize = (s) => (s || '').replace(/\s+/g, ' ').trim();
+    return normalize(firstHeading.textContent) === normalize(title);
   }
 
   // ---------- חילוץ: תבנית Angular (guide + info) ----------
@@ -170,7 +212,9 @@
   function buildAndDownloadDocx(pageTitle, sections) {
     const bodyParts = sections.map((sec, idx) => {
       const pageBreak = idx > 0 ? '<br clear="all" style="page-break-before:always">' : '';
-      return `${pageBreak}<h2>${escapeHtml(sec.title)}</h2>\n${cleanHtml(sec.html)}`;
+      const skipOwnTitle = contentAlreadyStartsWithTitle(sec.html, sec.title);
+      const titleHtml = skipOwnTitle ? '' : `<h2>${escapeHtml(sec.title)}</h2>\n`;
+      return `${pageBreak}${titleHtml}${cleanHtml(sec.html)}`;
     });
 
     const fullHtml = `<!DOCTYPE html>
