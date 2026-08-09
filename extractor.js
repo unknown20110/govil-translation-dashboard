@@ -87,9 +87,14 @@
     wrapper.innerHTML = html || '';
 
     // הסרת אלמנטים לא רלוונטיים לתרגום, כולל widget השיתוף (שתפו:) של gov.il
+    // הערה: לא מסירים h2[name="ServiceDescription"] כאן לפי selector עיוור —
+    // בחלק מהדפים (למשל car_licence_renewal) הוא ריק לגמרי (זבל תבנית),
+    // אבל בדפים אחרים (למשל digital-tachograph-card) ה-CMS שם בו את תקציר
+    // השירות בפועל. ההסרה הגנרית של כותרות ריקות למטה מספיקה ובטוחה יותר —
+    // מסירה אותו רק כשהוא באמת ריק, בלי לאבד תוכן אמיתי (נתפס ותוקן 9.8.2026).
     wrapper
       .querySelectorAll(
-        'script, style, button, svg, img, iframe, nav, [aria-hidden="true"], .hidden-print, [name="AllSocialURLs"], h2[name="ServiceDescription"]'
+        'script, style, button, svg, img, iframe, nav, [aria-hidden="true"], .hidden-print, [name="AllSocialURLs"]'
       )
       .forEach((el) => el.remove());
 
