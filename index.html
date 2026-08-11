@@ -457,6 +457,58 @@ tr:hover td { background: var(--surface2); }
 .modal-breakdown-val { color: var(--text); font-weight: 600; min-width: 2.5rem; text-align: right; }
 .modal-section-title { font-size: .78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .4rem; }
 
+/* ── Ministry detail modal ───────────────────────────────────────────────── */
+.modal-box-wide { width: min(760px, 94vw); }
+.modal-box-scroll { overflow-y: auto; }
+.modal-priority-box {
+  display: flex; align-items: center; gap: .6rem;
+  background: var(--red-dim); border: 1px solid var(--red);
+  border-radius: 8px; padding: .65rem 1rem; font-size: .82rem;
+}
+.modal-priority-box .mp-views { color: var(--red); font-weight: 700; white-space: nowrap; }
+.modal-page-list {
+  overflow-y: auto;
+  max-height: 260px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.modal-page-row {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .5rem .75rem;
+  border-bottom: 1px solid var(--border);
+  font-size: .8rem;
+}
+.modal-page-row:last-child { border-bottom: none; }
+.modal-page-row:hover { background: var(--surface2); }
+.modal-page-title {
+  flex: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.modal-page-title a { color: inherit; text-decoration: none; }
+.modal-page-title a:hover { color: var(--accent); }
+.modal-page-pills { flex: 1.6; display: flex; flex-wrap: wrap; gap: 2px; }
+.modal-page-views { flex: 0 0 56px; text-align: left; color: var(--muted); font-size: .76rem; }
+
+/* ── Delta badges (שינוי בין ריצות) ──────────────────────────────────────── */
+.kpi-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: .74rem;
+  font-weight: 700;
+  margin-top: .5rem;
+  padding: .12rem .55rem;
+  border-radius: 20px;
+}
+.delta-up   { color: var(--green); background: var(--green-dim); }
+.delta-down { color: var(--red);   background: var(--red-dim); }
+.delta-flat { color: var(--muted); background: var(--surface2); }
+
 </style>
 </head>
 <body>
@@ -510,6 +562,55 @@ tr:hover td { background: var(--surface2); }
     </div>
     <div class="modal-section-title">רשימת הדפים המוחרגים</div>
     <div class="modal-list" id="modal-excl-list"></div>
+  </div>
+</div>
+
+<!-- ── Ministry Detail Modal ── -->
+<div class="modal-overlay" id="ministry-modal">
+  <div class="modal-box modal-box-wide modal-box-scroll">
+    <div class="modal-header">
+      <div>
+        <h3 id="mm-name">—</h3>
+        <div id="mm-ar-name" style="font-size:.8rem;color:var(--muted);margin-top:.2rem;direction:rtl"></div>
+      </div>
+      <button class="modal-close" onclick="closeMinistryModal()">×</button>
+    </div>
+
+    <div class="modal-stats">
+      <div class="modal-stat-card">
+        <div class="modal-stat-value" id="mm-pages" style="color:var(--accent)">0</div>
+        <div class="modal-stat-label">דפים</div>
+      </div>
+      <div class="modal-stat-card">
+        <div class="modal-stat-value" id="mm-views" style="color:var(--accent)">0</div>
+        <div class="modal-stat-label">סה"כ צפיות</div>
+      </div>
+      <div class="modal-stat-card">
+        <div class="modal-stat-value" id="mm-pct">0%</div>
+        <div class="modal-stat-label">כיסוי ערבית</div>
+        <div id="mm-pct-delta"></div>
+      </div>
+    </div>
+
+    <div id="mm-priority-wrap"></div>
+
+    <div>
+      <div class="modal-section-title">כיסוי ערבית לפי סוג דף</div>
+      <div class="modal-breakdown" id="mm-type-breakdown"></div>
+    </div>
+
+    <div>
+      <div class="modal-section-title">מגמת כיסוי ערבית לאורך הריצות</div>
+      <div class="chart-wrap" style="height:180px"><canvas id="chart-mm-trend"></canvas></div>
+      <div id="mm-trend-note" style="display:none;font-size:.78rem;color:var(--muted);text-align:center;padding:.5rem">
+        אין מספיק ריצות היסטוריות עם דפים למשרד זה כדי להציג מגמה
+      </div>
+    </div>
+
+    <div>
+      <div class="modal-section-title">דפי המשרד (ממוין לפי צפיות)</div>
+      <div class="modal-page-list" id="mm-page-list"></div>
+    </div>
   </div>
 </div>
 
@@ -637,6 +738,7 @@ const LANG_META = {
 
 let allRuns = [];
 let currentPages = [];
+let currentRunIdx = 0;
 let sortCol = 'views';
 let sortAsc = false;
 let charts = {};
@@ -755,34 +857,51 @@ async function loadData() {
 }
 
 function loadRun(idx) {
+  currentRunIdx = idx;
   const run = allRuns[idx];
   currentPages = run.pages;
   updateExclusionBadge(run.originalPages || run.pages, run.pages);
-  renderOverview(run);
+  renderOverview(run, idx);
   renderTable(currentPages);
-  renderMinistries(currentPages);
+  renderMinistries(currentPages, idx);
   renderTrends();
 }
 
+// ── Delta badges (שינוי % מהריצה הקודמת) ────────────────────────────────────
+function pctDeltaHTML(curr, prev) {
+  if (prev === null || prev === undefined) return '';
+  const d = curr - prev;
+  if (d === 0) return `<span class="kpi-delta delta-flat">ללא שינוי</span>`;
+  const up = d > 0;
+  return `<span class="kpi-delta ${up ? 'delta-up' : 'delta-down'}">${up ? '↑' : '↓'} ${up ? '+' : ''}${d}%</span>`;
+}
+
 // ── KPIs ──────────────────────────────────────────────────────────────────
-function renderOverview(run) {
+function renderOverview(run, idx) {
   const pages = run.pages;
   const total = pages.length;
   const totalViews = pages.reduce((s, p) => s + p.views, 0);
+  const prevPages = idx > 0 ? allRuns[idx - 1].pages : null;
 
   const kpiRow = document.getElementById('kpi-row');
   const kpis = [
-    { label: 'סה"כ דפים', value: total.toLocaleString('he'), sub: 'דפים עבריים', color: 'var(--accent)' },
-    { label: 'סה"כ צפיות', value: fmtNum(totalViews), sub: 'בתקופה זו', color: 'var(--accent)' },
+    { label: 'סה"כ דפים', value: total.toLocaleString('he'), sub: 'דפים עבריים', color: 'var(--accent)', delta: '' },
+    { label: 'סה"כ צפיות', value: fmtNum(totalViews), sub: 'בתקופה זו', color: 'var(--accent)', delta: '' },
   ];
   Object.entries(LANG_META).forEach(([lc, meta]) => {
     const count = pages.filter(p => p[`has_${lc}`]).length;
     const pct = total ? Math.round(count / total * 100) : 0;
+    let prevPct = null;
+    if (prevPages && prevPages.length) {
+      const prevCount = prevPages.filter(p => p[`has_${lc}`]).length;
+      prevPct = Math.round(prevCount / prevPages.length * 100);
+    }
     kpis.push({
       label: `מתורגם — ${meta.label}`,
       value: `${pct}%`,
       sub: `${count} מתוך ${total} דפים`,
       color: meta.color,
+      delta: pctDeltaHTML(pct, prevPct),
     });
   });
 
@@ -791,6 +910,7 @@ function renderOverview(run) {
       <div class="kpi-label">${k.label}</div>
       <div class="kpi-value" style="color:${k.color}">${k.value}</div>
       <div class="kpi-sub">${k.sub}</div>
+      ${k.delta}
     </div>
   `).join('');
 
@@ -913,9 +1033,12 @@ function langPills(p) {
 }
 
 // ── Ministry grid ──────────────────────────────────────────────────────────
-function renderMinistries(pages) {
+function renderMinistries(pages, idx) {
   const byMinistry = groupBy(pages, 'ministry_he');
   const grid = document.getElementById('ministry-grid');
+
+  const prevPages = idx > 0 ? allRuns[idx - 1].pages : null;
+  const prevByMinistry = prevPages ? groupBy(prevPages, 'ministry_he') : null;
 
   const cards = Object.entries(byMinistry)
     .filter(([k]) => k)
@@ -931,12 +1054,19 @@ function renderMinistries(pages) {
         langCounts[lc] = ps.filter(p => p[`has_${lc}`]).length;
       });
 
-      return { name, arName, ps, totalViews, pct, color, langCounts };
+      let deltaHtml = '';
+      const prevPs = prevByMinistry ? prevByMinistry[name] : null;
+      if (prevPs && prevPs.length) {
+        const prevPct = Math.round(prevPs.filter(p => p.has_ar).length / prevPs.length * 100);
+        deltaHtml = pctDeltaHTML(pct, prevPct);
+      }
+
+      return { name, arName, ps, totalViews, pct, color, langCounts, deltaHtml };
     })
     .sort((a,b) => b.totalViews - a.totalViews);
 
   grid.innerHTML = cards.map(c => `
-    <div class="ministry-card">
+    <div class="ministry-card" onclick="openMinistryModal('${c.name.replace(/'/g, "\\'")}')">
       <div class="ministry-name">${c.name}</div>
       ${c.arName ? `<div class="ministry-ar-name">${c.arName}</div>` : ''}
       <div class="lang-row">
@@ -953,9 +1083,153 @@ function renderMinistries(pages) {
         </div>
         <span class="progress-pct" style="color:${c.color}">${c.pct}%</span>
       </div>
+      ${c.deltaHtml ? `<div style="margin-top:.4rem">${c.deltaHtml}</div>` : ''}
     </div>
   `).join('');
 }
+
+// ── Ministry detail modal ───────────────────────────────────────────────────
+function openMinistryModal(name) {
+  const ps = currentPages.filter(p => p.ministry_he === name);
+  if (!ps.length) return;
+
+  document.getElementById('mm-name').textContent = name;
+  document.getElementById('mm-ar-name').textContent = ps[0]?.ministry_ar || '';
+
+  const totalViews = ps.reduce((s, p) => s + p.views, 0);
+  const arCount = ps.filter(p => p.has_ar).length;
+  const pct = Math.round(arCount / ps.length * 100);
+  const pctColor = pct >= 80 ? 'var(--green)' : pct >= 40 ? 'var(--orange)' : 'var(--red)';
+
+  document.getElementById('mm-pages').textContent = ps.length;
+  document.getElementById('mm-views').textContent = fmtNum(totalViews);
+  const pctEl = document.getElementById('mm-pct');
+  pctEl.textContent = pct + '%';
+  pctEl.style.color = pctColor;
+
+  // דלתא מול הריצה הקודמת (אם קיימת)
+  const prevRun = currentRunIdx > 0 ? allRuns[currentRunIdx - 1] : null;
+  let mmDelta = '';
+  if (prevRun) {
+    const prevPs = prevRun.pages.filter(p => p.ministry_he === name);
+    if (prevPs.length) {
+      const prevPct = Math.round(prevPs.filter(p => p.has_ar).length / prevPs.length * 100);
+      mmDelta = pctDeltaHTML(pct, prevPct);
+    }
+  }
+  document.getElementById('mm-pct-delta').innerHTML = mmDelta;
+
+  // C: הדף הכי דחוף לתרגום (הכי הרבה צפיות בלי ערבית)
+  const untranslated = ps.filter(p => !p.has_ar).sort((a, b) => b.views - a.views);
+  const priorityWrap = document.getElementById('mm-priority-wrap');
+  if (untranslated.length) {
+    const top = untranslated[0];
+    const title = top.title_he || top.slug;
+    priorityWrap.innerHTML = `
+      <div class="modal-priority-box">
+        <span>🔴 הכי דחוף לתרגום:</span>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${title}">${title}</span>
+        <span class="mp-views">${fmtNum(top.views)} צפיות</span>
+      </div>`;
+  } else {
+    priorityWrap.innerHTML = `
+      <div class="modal-priority-box" style="background:var(--green-dim);border-color:var(--green);color:var(--green)">
+        ✅ כל דפי המשרד מתורגמים לערבית
+      </div>`;
+  }
+
+  // D: פילוח כיסוי ערבית לפי סוג דף
+  const typeMap = {};
+  ps.forEach(p => {
+    const t = p.page_type || 'לא מוגדר';
+    if (!typeMap[t]) typeMap[t] = { total: 0, ar: 0 };
+    typeMap[t].total++;
+    if (p.has_ar) typeMap[t].ar++;
+  });
+  const typeBreakdown = document.getElementById('mm-type-breakdown');
+  typeBreakdown.innerHTML = Object.entries(typeMap)
+    .sort((a, b) => b[1].total - a[1].total)
+    .map(([type, v]) => {
+      const p = Math.round(v.ar / v.total * 100);
+      const c = p >= 80 ? '#3fb950' : p >= 40 ? '#d29922' : '#f85149';
+      return `
+        <div class="modal-breakdown-row">
+          <span class="modal-breakdown-label">${type}</span>
+          <div class="modal-breakdown-bar-wrap"><div class="modal-breakdown-bar" style="width:${p}%;background:${c}"></div></div>
+          <span class="modal-breakdown-val">${v.ar}/${v.total}</span>
+        </div>`;
+    }).join('');
+
+  // B: מגמת כיסוי ערבית של המשרד לאורך הריצות
+  renderMinistryTrend(name);
+
+  // A: טבלת דפי המשרד, ממוינת לפי צפיות
+  const listEl = document.getElementById('mm-page-list');
+  const sorted = [...ps].sort((a, b) => b.views - a.views);
+  listEl.innerHTML = sorted.map(p => `
+    <div class="modal-page-row">
+      <span class="modal-page-title"><a href="${p.url}" target="_blank" title="${p.title_he || p.slug}">${p.title_he || p.slug}</a></span>
+      <span class="modal-page-pills">${langPills(p)}</span>
+      <span class="modal-page-views">${fmtNum(p.views)}</span>
+    </div>`).join('') || '<div class="modal-page-row" style="color:var(--muted)">אין דפים</div>';
+
+  document.getElementById('ministry-modal').classList.add('open');
+}
+
+function closeMinistryModal() {
+  document.getElementById('ministry-modal').classList.remove('open');
+}
+
+function renderMinistryTrend(name) {
+  destroyChart('mm-trend');
+  const canvas = document.getElementById('chart-mm-trend');
+  const note = document.getElementById('mm-trend-note');
+
+  const points = allRuns.map(r => {
+    const ps = r.pages.filter(p => p.ministry_he === name);
+    return {
+      date: r.run_date,
+      pct: ps.length ? Math.round(ps.filter(p => p.has_ar).length / ps.length * 100) : null,
+      count: ps.length,
+    };
+  });
+
+  const validRuns = points.filter(pt => pt.count > 0);
+  if (validRuns.length < 2) {
+    canvas.style.display = 'none';
+    note.style.display = 'block';
+    return;
+  }
+  canvas.style.display = '';
+  note.style.display = 'none';
+
+  charts['mm-trend'] = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: points.map(p => p.date),
+      datasets: [{
+        label: 'כיסוי ערבית',
+        data: points.map(p => p.pct),
+        borderColor: '#58a6ff',
+        backgroundColor: '#58a6ff22',
+        tension: .4, fill: true, pointRadius: 5, pointHoverRadius: 7, spanGaps: true,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + ctx.raw + '% ערבית' } } },
+      scales: {
+        y: { min: 0, max: 100, ticks: { color: '#7d8590', callback: v => v + '%' }, grid: { color: '#30363d' } },
+        x: { ticks: { color: '#7d8590' }, grid: { color: '#30363d' } },
+      }
+    }
+  });
+}
+
+document.addEventListener('click', e => {
+  const modal = document.getElementById('ministry-modal');
+  if (e.target === modal) closeMinistryModal();
+});
 
 // ── Trends ─────────────────────────────────────────────────────────────────
 function renderTrends() {
