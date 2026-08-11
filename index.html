@@ -814,8 +814,10 @@ function updateExclusionBadge(originalPages, filteredPages) {
   // List
   const list = document.getElementById('modal-excl-list');
   if (excluded.length === 0) {
-    list.innerHTML = '<div class="modal-list-item" style="color:var(--green)">אין דפים מוחרגים</div>';
-  } else {
+      list.innerHTML = exclusionSet.size > 0
+        ? '<div class="modal-list-item" style="color:var(--green)">✓ אין דפים מוחרגים בריצה זו — כל הדפים ברשימת רונית כבר סוננו מראש בשלב איסוף הנתונים, לפני שהריצה התחילה</div>'
+        : '<div class="modal-list-item" style="color:var(--green)">אין דפים מוחרגים</div>';
+    } else {
     list.innerHTML = excluded.map(p => {
       const path = p.url ? (() => { try { return new URL(p.url).pathname; } catch { return p.url; } })() : (p.slug || '');
       return `<div class="modal-list-item">${path}</div>`;
