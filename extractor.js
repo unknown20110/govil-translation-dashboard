@@ -150,16 +150,9 @@
     return normalize(firstHeading.textContent) === normalize(title);
   }
 
-  // [17.8.2026] פותחת אקורדיונים מקופלים (למשל "שאלות ותשובות" מתקפלות)
-  // בתוך container לפני החילוץ. נתפס באג אמיתי: עמוד עם FAQ accordion קיפולי
-  // החזיר רק כותרות (328 תווים בסה"כ מכל 7 פרקים) — הקוד הקודם לחץ רק על
-  // טאבי הפרקים עצמם, לא על הפריטים המתקפלים בתוכם, אז ה-HTML שנתפס היה
-  // עדיין סגור. aria-expanded="false" הוא attribute תקני של ARIA (לא
-  // ספציפי למימוש) שרוב רכיבי accordion נגישים מעדכנים נכון — לכן זו בחירה
-  // כללית-יותר מחיפוש טקסט כמו "לפתוח הכל", לא רק פתרון-נקודתי לעמוד הזה.
-  // רץ בלולאה (לא פעם אחת) כדי לכסות גם אקורדיונים מקוננים שנחשפים רק אחרי
-  // שההורה שלהם נפתח. ⚠️ לא נבדק מול DOM חי — לבדוק בפועל על כמה סוגי עמודים
-  // לפני הפצה רחבה (ראו הערה בהאנדאוף/בצ'אט).
+  // [17.8.2026] פותחת אקורדיונים מקופלים בתוך container (בלולאה, לכיסוי
+  // אקורדיונים מקוננים). נשמר כרשת ביטחון כללית לעמודים שבהם תוכן מקופל
+  // באמת lazy — אבל ראו ההערה למטה: זה *לא* היה שורש הבאג ב-subsidy-faq.
   async function expandAllCollapsedSections(container) {
     if (!container) return 0;
     let totalOpened = 0;
@@ -171,6 +164,32 @@
       await sleep(200); // מרווח לרינדור התוכן שנחשף
     }
     return totalOpened;
+  }
+
+  // [17.8.2026, גרסה 2 — אחרי בדיקת קובץ MHTML אמיתי של הדף החי] האבחון
+  // המדויק: בלוק "שאלות ותשובות" (id="faqs_N") הוא *לא* צאצא של
+  // htmlContent_N בכלל — הוא אח שלו, div נפרד תחת אותו הורה (לצד
+  // h3#content_title). לכן:
+  //   1. חיפוש [aria-expanded="false"] בתוך htmlContent עצמו (גרסה 1 של
+  //      התיקון) תמיד מצא אפס תוצאות — לא הייתה טעות במנגנון עצמו, רק
+  //      בקונטיינר שחיפשנו בו.
+  //   2. תוכן התשובות כבר קיים ב-DOM גם כשהפריט מקופל (רק גובה מוסתר
+  //      ב-CSS, לא lazy-render אמיתי) — אומת על כמה שאלות שונות. לא היינו
+  //      חייבים בכלל ללחוץ, רק לאסוף את הבלוק הנכון.
+  //   3. כותרת כל שאלה עטופה ב-<button aria-expanded=...>, ו-cleanHtml
+  //      הכללית (למטה) כבר מוחקת כל תגית button — בלי טיפול נפרד זה מוחק
+  //      גם את טקסט השאלה עצמו, לא רק את מנגנון הקיפול.
+  function findAdjacentFaqBlock(contentEl) {
+    if (!contentEl || !contentEl.parentElement) return null;
+    return contentEl.parentElement.querySelector('[id^="faqs_"]');
+  }
+
+  function unwrapFaqQuestionButtons(container) {
+    if (!container) return;
+    container.querySelectorAll('button[aria-expanded]').forEach((btn) => {
+      while (btn.firstChild) btn.parentNode.insertBefore(btn.firstChild, btn);
+      btn.remove();
+    });
   }
 
   // ---------- חילוץ: תבנית Angular (guide + info) ----------
@@ -199,10 +218,13 @@
         document.getElementById('content_title') ||
         document.getElementById('contentPageHeadTitle') ||
         document.querySelector('h1');
-      await expandAllCollapsedSections(contentEl); // [17.8.2026]
+      await expandAllCollapsedSections(contentEl);
+      const faqEl = findAdjacentFaqBlock(contentEl); // [17.8.2026]
+      await expandAllCollapsedSections(faqEl);
+      unwrapFaqQuestionButtons(faqEl);
       sections.push({
         title: titleEl ? titleEl.textContent.trim() : document.title,
-        html: contentEl ? contentEl.innerHTML : '',
+        html: (contentEl ? contentEl.innerHTML : '') + (faqEl ? faqEl.innerHTML : ''),
       });
       return sections;
     }
@@ -219,12 +241,15 @@
       btn.click();
       const contentEl = await waitForContentSwap(prevHtml);
       await sleep(150); // מרווח ביטחון קטן לרינדור מלא
-      await expandAllCollapsedSections(contentEl); // [17.8.2026] — כאן נתפס הבאג בפועל
+      await expandAllCollapsedSections(contentEl);
+      const faqEl = findAdjacentFaqBlock(contentEl); // [17.8.2026] — כאן נתפס הבאג בפועל
+      await expandAllCollapsedSections(faqEl);
+      unwrapFaqQuestionButtons(faqEl);
 
       const titleEl = document.getElementById('content_title');
       sections.push({
         title: (titleEl ? titleEl.textContent.trim() : '') || label,
-        html: contentEl ? contentEl.innerHTML : '',
+        html: (contentEl ? contentEl.innerHTML : '') + (faqEl ? faqEl.innerHTML : ''),
       });
     }
     return sections;
@@ -236,10 +261,13 @@
     const contentEl = document.querySelector('div.ServiceContainer');
     const titleEl = document.querySelector('.PageTitle') || document.querySelector('h1');
     await expandAllCollapsedSections(contentEl);
+    const faqEl = findAdjacentFaqBlock(contentEl); // [17.8.2026] הגנה זהה, לא נבדק על תבנית Service בפועל
+    await expandAllCollapsedSections(faqEl);
+    unwrapFaqQuestionButtons(faqEl);
     return [
       {
         title: titleEl ? titleEl.textContent.trim() : document.title,
-        html: contentEl ? contentEl.innerHTML : '',
+        html: (contentEl ? contentEl.innerHTML : '') + (faqEl ? faqEl.innerHTML : ''),
       },
     ];
   }
