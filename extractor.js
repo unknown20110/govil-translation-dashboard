@@ -150,6 +150,29 @@
     return normalize(firstHeading.textContent) === normalize(title);
   }
 
+  // [17.8.2026] פותחת אקורדיונים מקופלים (למשל "שאלות ותשובות" מתקפלות)
+  // בתוך container לפני החילוץ. נתפס באג אמיתי: עמוד עם FAQ accordion קיפולי
+  // החזיר רק כותרות (328 תווים בסה"כ מכל 7 פרקים) — הקוד הקודם לחץ רק על
+  // טאבי הפרקים עצמם, לא על הפריטים המתקפלים בתוכם, אז ה-HTML שנתפס היה
+  // עדיין סגור. aria-expanded="false" הוא attribute תקני של ARIA (לא
+  // ספציפי למימוש) שרוב רכיבי accordion נגישים מעדכנים נכון — לכן זו בחירה
+  // כללית-יותר מחיפוש טקסט כמו "לפתוח הכל", לא רק פתרון-נקודתי לעמוד הזה.
+  // רץ בלולאה (לא פעם אחת) כדי לכסות גם אקורדיונים מקוננים שנחשפים רק אחרי
+  // שההורה שלהם נפתח. ⚠️ לא נבדק מול DOM חי — לבדוק בפועל על כמה סוגי עמודים
+  // לפני הפצה רחבה (ראו הערה בהאנדאוף/בצ'אט).
+  async function expandAllCollapsedSections(container) {
+    if (!container) return 0;
+    let totalOpened = 0;
+    for (let round = 0; round < 5; round++) {
+      const collapsed = Array.from(container.querySelectorAll('[aria-expanded="false"]'));
+      if (collapsed.length === 0) break;
+      collapsed.forEach((el) => el.click());
+      totalOpened += collapsed.length;
+      await sleep(200); // מרווח לרינדור התוכן שנחשף
+    }
+    return totalOpened;
+  }
+
   // ---------- חילוץ: תבנית Angular (guide + info) ----------
 
   async function waitForContentSwap(prevHtml, timeoutMs = 4000, intervalMs = 100) {
@@ -176,6 +199,7 @@
         document.getElementById('content_title') ||
         document.getElementById('contentPageHeadTitle') ||
         document.querySelector('h1');
+      await expandAllCollapsedSections(contentEl); // [17.8.2026]
       sections.push({
         title: titleEl ? titleEl.textContent.trim() : document.title,
         html: contentEl ? contentEl.innerHTML : '',
@@ -195,6 +219,7 @@
       btn.click();
       const contentEl = await waitForContentSwap(prevHtml);
       await sleep(150); // מרווח ביטחון קטן לרינדור מלא
+      await expandAllCollapsedSections(contentEl); // [17.8.2026] — כאן נתפס הבאג בפועל
 
       const titleEl = document.getElementById('content_title');
       sections.push({
@@ -207,9 +232,10 @@
 
   // ---------- חילוץ: תבנית Service (ישנה) ----------
 
-  function extractService() {
+  async function extractService() {
     const contentEl = document.querySelector('div.ServiceContainer');
     const titleEl = document.querySelector('.PageTitle') || document.querySelector('h1');
+    await expandAllCollapsedSections(contentEl);
     return [
       {
         title: titleEl ? titleEl.textContent.trim() : document.title,
@@ -258,7 +284,7 @@ ${bodyParts.join('\n')}
       let sections = [];
 
       if (pageType === 'service') {
-        sections = extractService();
+        sections = await extractService();
       } else if (pageType === 'angular') {
         sections = await extractAngular();
       } else {
