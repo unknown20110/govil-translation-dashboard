@@ -77,6 +77,13 @@
   function detectPageType() {
     if (document.querySelector('div.ServiceContainer')) return 'service';
     if (document.querySelector('div[id^="htmlContent_"]')) return 'angular';
+    // [17.8.2026] דף "שאלות ותשובות" טהור — למשל gov.il/he/pages/10052018_2
+    // — בלי htmlContent_/ServiceContainer בכלל, רק רשימת קבוצות faqs_N
+    // ישירות על העמוד. אותה קומפוננטת accordion שכבר מטופלת בתוך extractAngular
+    // (findAdjacentFaqBlock/unwrapFaqQuestionButtons), רק בלי guide/info עוטף.
+    // הבדיקה הזו אחרונה בכוונה: אם htmlContent_ כבר נמצא למעלה (עמוד guide
+    // עם FAQ צמוד, כמו subsidy-faq), חוזרים 'angular' ולא מגיעים לכאן בכלל.
+    if (document.querySelector('[id^="faqs_"]')) return 'faqOnly';
     return 'unknown';
   }
 
@@ -255,6 +262,33 @@
     return sections;
   }
 
+  // ---------- חילוץ: תבנית "שאלות ותשובות" טהורה (בלי guide/info עוטף) ----------
+  // [17.8.2026] דוגמה: gov.il/he/pages/10052018_2. כל העמוד בנוי מרשימת
+  // קבוצות faqs_N ישירות (בלי htmlContent_/ServiceContainer בכלל). כל קבוצה
+  // הופכת לפרק נפרד בקובץ הסופי — המקבילה הכי טבעית ל"טאב" בתבנית Angular
+  // guide. כותרת הקבוצה (faqs_N_head_title, תג h3) כבר חלק מה-innerHTML
+  // באופן טבעי, אז contentAlreadyStartsWithTitle הקיימת מזהה את זה נכון
+  // ולא מזריקה כותרת כפולה — בלי שום שינוי שם.
+  async function extractFaqOnlyPage() {
+    const sections = [];
+    const groups = Array.from(document.querySelectorAll('[id^="faqs_"]')).filter((el) =>
+      /^faqs_\d+$/.test(el.id)
+    );
+
+    for (let i = 0; i < groups.length; i++) {
+      const group = groups[i];
+      const headEl = document.getElementById(`${group.id}_head_title`);
+      const title = headEl ? headEl.textContent.trim() : `שאלות ותשובות ${i + 1}`;
+      toast(`סורק קבוצה ${i + 1} מתוך ${groups.length}: ${title}`);
+
+      await expandAllCollapsedSections(group);
+      unwrapFaqQuestionButtons(group);
+
+      sections.push({ title, html: group.innerHTML });
+    }
+    return sections;
+  }
+
   // ---------- חילוץ: תבנית Service (ישנה) ----------
 
   async function extractService() {
@@ -315,8 +349,10 @@ ${bodyParts.join('\n')}
         sections = await extractService();
       } else if (pageType === 'angular') {
         sections = await extractAngular();
+      } else if (pageType === 'faqOnly') {
+        sections = await extractFaqOnlyPage();
       } else {
-        alert('לא זוהה מבנה עמוד מוכר (לא Service ולא Angular guide/info). אולי זה סוג עמוד חדש שצריך למפות.');
+        alert('לא זוהה מבנה עמוד מוכר (לא Service, לא Angular guide/info, ולא דף שאלות-ותשובות טהור). אולי זה סוג עמוד חדש שצריך למפות.');
         return;
       }
 
